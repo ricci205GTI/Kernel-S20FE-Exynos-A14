@@ -28,6 +28,7 @@
 #include <linux/bug.h>
 #include <linux/errno.h>
 
+#include <asm/unaligned.h>
 #include <asm/byteorder.h>
 #include <asm/word-at-a-time.h>
 #include <asm/page.h>
@@ -261,12 +262,12 @@ EXPORT_SYMBOL(strscpy);
  * @src: pointer to the beginning of string being copied from. Must not overlap
  *       dest.
  *
- * stpcpy differs from strcpy in a key way: the return value is a pointer
- * to the new %NUL-terminating character in @dest. (For strcpy, the return
- * value is a pointer to the start of @dest). This interface is considered
- * unsafe as it doesn't perform bounds checking of the inputs. As such it's
- * not recommended for usage. Instead, its definition is provided in case
- * the compiler lowers other libcalls to stpcpy.
+ * stpcpy differs from strcpy in a key way: the return value is the new
+ * %NUL-terminated character. (for strcpy, the return value is a pointer to
+ * src. This interface is considered unsafe as it doesn't perform bounds
+ * checking of the inputs. As such it's not recommended for usage. Instead,
+ * its definition is provided in case the compiler lowers other libcalls to
+ * stpcpy.
  */
 char *stpcpy(char *__restrict__ dest, const char *__restrict__ src);
 char *stpcpy(char *__restrict__ dest, const char *__restrict__ src)
@@ -977,6 +978,21 @@ __visible int memcmp(const void *cs, const void *ct, size_t count)
 	const unsigned char *su1, *su2;
 	int res = 0;
 
+#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+	if (count >= sizeof(unsigned long)) {
+		const unsigned long *u1 = cs;
+		const unsigned long *u2 = ct;
+		do {
+			if (get_unaligned(u1) != get_unaligned(u2))
+				break;
+			u1++;
+			u2++;
+			count -= sizeof(unsigned long);
+		} while (count >= sizeof(unsigned long));
+		cs = u1;
+		ct = u2;
+	}
+#endif
 	for (su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
 		if ((res = *su1 - *su2) != 0)
 			break;
@@ -1080,24 +1096,61 @@ char *strnstr(const char *s1, const char *s2, size_t len)
 EXPORT_SYMBOL(strnstr);
 #endif
 
+#if defined(CONFIG_ARCH_HAS_FAST_MULTIPLIER) && BITS_PER_LONG == 64
+
+#define MEMCHR_MASK_GEN(mask) (mask *= 0x0101010101010101ULL)
+
+#elif defined(CONFIG_ARCH_HAS_FAST_MULTIPLIER)
+
+#define MEMCHR_MASK_GEN(mask)                                                  \
+	do {                                                                   \
+		mask *= 0x01010101;                                            \
+		mask |= mask << 32;                                            \
+	} while (0)
+
+#else
+
+#define MEMCHR_MASK_GEN(mask)                                                  \
+	do {                                                                   \
+		mask |= mask << 8;                                             \
+		mask |= mask << 16;                                            \
+		mask |= mask << 32;                                            \
+	} while (0)
+
+#endif
+
 #ifndef __HAVE_ARCH_MEMCHR
 /**
  * memchr - Find a character in an area of memory.
- * @s: The memory area
+ * @p: The memory area
  * @c: The byte to search for
- * @n: The size of the area.
+ * @length: The size of the area.
  *
  * returns the address of the first occurrence of @c, or %NULL
  * if @c is not found
  */
-void *memchr(const void *s, int c, size_t n)
+void *memchr(const void *p, int c, unsigned long length)
 {
-	const unsigned char *p = s;
-	while (n-- != 0) {
-        	if ((unsigned char)c == *p++) {
-			return (void *)(p - 1);
+	u64 mask, val;
+	const void *end = p + length;
+
+	c &= 0xff;
+	if (p <= end - 8) {
+		mask = c;
+		MEMCHR_MASK_GEN(mask);
+
+		for (; p <= end - 8; p += 8) {
+			val = *(u64 *)p ^ mask;
+			if ((val + 0xfefefefefefefeffu) &
+			    (~val & 0x8080808080808080u))
+				break;
 		}
 	}
+
+	for (; p < end; p++)
+		if (*(unsigned char *)p == c)
+			return (void *)p;
+
 	return NULL;
 }
 EXPORT_SYMBOL(memchr);
@@ -1133,16 +1186,7 @@ void *memchr_inv(const void *start, int c, size_t bytes)
 		return check_bytes8(start, value, bytes);
 
 	value64 = value;
-#if defined(CONFIG_ARCH_HAS_FAST_MULTIPLIER) && BITS_PER_LONG == 64
-	value64 *= 0x0101010101010101ULL;
-#elif defined(CONFIG_ARCH_HAS_FAST_MULTIPLIER)
-	value64 *= 0x01010101;
-	value64 |= value64 << 32;
-#else
-	value64 |= value64 << 8;
-	value64 |= value64 << 16;
-	value64 |= value64 << 32;
-#endif
+	MEMCHR_MASK_GEN(value64);
 
 	prefix = (unsigned long)start % 8;
 	if (prefix) {

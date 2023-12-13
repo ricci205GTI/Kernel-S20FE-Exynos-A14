@@ -22,9 +22,6 @@
 #include <linux/wakelock.h>
 #include <linux/hall.h>
 #include <linux/notifier.h>
-#ifdef CONFIG_BATTERY_SAMSUNG
-#include <linux/sec_batt.h>
-#endif
 #include <linux/sec_class.h>
 
 #if defined(CONFIG_HALL_NEW_NODE)
@@ -287,13 +284,6 @@ static int hall_probe(struct platform_device *pdev)
 	int error;
 	int wakeup = 0;
 
-#ifdef CONFIG_BATTERY_SAMSUNG
-	if (lpcharge == 1) {
-		pr_err("Do not load driver due to : lpm %d\n", lpcharge);
-		return -ENODEV;
-	}
-#endif
-
 	ddata = devm_kzalloc(&pdev->dev, sizeof(struct hall_drvdata),
 			GFP_KERNEL);
 	if (!ddata)
@@ -329,7 +319,7 @@ static int hall_probe(struct platform_device *pdev)
 
 	input->evbit[0] |= BIT_MASK(EV_SW);
 
-	ddata->event_val = SW_LID;
+	ddata->event_val = SW_FLIP;
 
 	input_set_capability(input, EV_SW, ddata->event_val);
 

@@ -14,11 +14,6 @@ struct sec_ts_data *tsp_info;
 
 #include "sec_ts.h"
 
-#ifdef CONFIG_FB
-#include <linux/notifier.h>
-#include <linux/fb.h>
-#endif
-
 struct sec_ts_data *ts_dup;
 
 #ifdef USE_POWER_RESET_WORK
@@ -1210,8 +1205,7 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 				ts->coord[t_id].action = p_event_coord->tchsta;
 				ts->coord[t_id].x = (p_event_coord->x_11_4 << 4) | (p_event_coord->x_3_0);
 				ts->coord[t_id].y = (p_event_coord->y_11_4 << 4) | (p_event_coord->y_3_0);
-				ts->coord[t_id].z = p_event_coord->z & 
-					                SEC_TS_PRESSURE_MAX;
+				ts->coord[t_id].z = p_event_coord->z & 0x3F;
 				ts->coord[t_id].ttype = p_event_coord->ttype_3_2 << 2 | p_event_coord->ttype_1_0 << 0;
 				ts->coord[t_id].major = p_event_coord->major;
 				ts->coord[t_id].minor = p_event_coord->minor;
@@ -2173,7 +2167,9 @@ static int sec_ts_parse_dt(struct i2c_client *client)
 	of_property_read_u32(np, "sec,ss_touch_num", &pdata->ss_touch_num);
 	input_err(true, dev, "%s: ss_touch_num:%d\n", __func__, pdata->ss_touch_num);
 #endif
+#ifdef CONFIG_SEC_FACTORY
 	pdata->support_mt_pressure = true;
+#endif
 	input_err(true, &client->dev, "%s: i2c buffer limit: %d, lcd_id:%06X, bringup:%d, FW:%s(%d),"
 			" id:%d,%d, mis_cal:%d dex:%d, max(%d/%d), FOD:%d, AOT:%d\n",
 			__func__, pdata->i2c_burstmax, lcdtype, pdata->bringup, pdata->firmware_name,
@@ -2377,8 +2373,7 @@ static void sec_ts_set_input_prop(struct sec_ts_data *ts, struct input_dev *dev,
 	input_set_abs_params(dev, ABS_MT_TOUCH_MINOR, 0, 255, 0, 0);
 	input_set_abs_params(dev, ABS_MT_CUSTOM, 0, 0xFFFFFFFF, 0, 0);
 	if (ts->plat_data->support_mt_pressure)
-		input_set_abs_params(dev, ABS_MT_PRESSURE, 0,
-				        SEC_TS_PRESSURE_MAX, 0, 0);
+		input_set_abs_params(dev, ABS_MT_PRESSURE, 0, 255, 0, 0);
 
 	if (propbit == INPUT_PROP_POINTER)
 		input_mt_init_slots(dev, MAX_SUPPORT_TOUCH_COUNT, INPUT_MT_POINTER);
@@ -2387,12 +2382,6 @@ static void sec_ts_set_input_prop(struct sec_ts_data *ts, struct input_dev *dev,
 
 	input_set_drvdata(dev, ts);
 }
-
-#ifdef CONFIG_FB
-static int fb_notifier_callback(struct notifier_block *self,
-				unsigned long event,
-				void *data);
-#endif
 
 static int sec_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -2655,12 +2644,6 @@ static int sec_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		input_err(true, &ts->client->dev, "%s: Unable to request threaded irq\n", __func__);
 		goto err_irq;
 	}
-
-#ifdef CONFIG_FB
-	ts->fb_notif.notifier_call = fb_notifier_callback;
-	if (fb_register_client(&ts->fb_notif))
-		pr_err("%s: could not create fb notifier\n", __func__);
-#endif
 
 #ifdef CONFIG_SAMSUNG_TUI
 	tsp_info = ts;
@@ -3439,10 +3422,6 @@ static int sec_ts_remove(struct i2c_client *client)
 	ts_dup = NULL;
 	ts->plat_data->power(ts, false);
 
-#ifdef CONFIG_FB
-	fb_unregister_client(&ts->fb_notif);
-#endif
-
 #ifdef CONFIG_SAMSUNG_TUI
 	tsp_info = NULL;
 #endif
@@ -3575,36 +3554,6 @@ static int sec_ts_pm_resume(struct device *dev)
 
 	if (ts->lowpower_mode)
 		complete_all(&ts->resume_done);
-
-	return 0;
-}
-#endif
-
-#ifdef CONFIG_FB
-static int fb_notifier_callback(struct notifier_block *self,
-				unsigned long event,
-				void *data)
-{
-	struct fb_event *evdata = data;
-	struct sec_ts_data *tc_data = container_of(self, struct sec_ts_data, fb_notif);
-
-	if (evdata && evdata->data && event == FB_EVENT_BLANK) {
-		int *blank = evdata->data;
-		switch (*blank) {
-		case FB_BLANK_UNBLANK:
-		case FB_BLANK_NORMAL:
-		case FB_BLANK_VSYNC_SUSPEND:
-		case FB_BLANK_HSYNC_SUSPEND:
-		        sec_ts_input_open(tc_data->input_dev);
-			break;
-		case FB_BLANK_POWERDOWN:
-		        sec_ts_input_close(tc_data->input_dev);
-			break;
-		default:
-			/* Don't handle what we don't understand */
-			break;
-		}
-	}
 
 	return 0;
 }

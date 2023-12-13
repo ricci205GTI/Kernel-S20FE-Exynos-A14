@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  *
- * (C) COPYRIGHT 2019-2021 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2019-2022 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -122,8 +122,7 @@ struct memory_group_manager_ops {
 	 * This function allows the memory group manager to modify a GPU page
 	 * table entry before it is stored by the kbase module (controller
 	 * driver). It may set certain bits in the page table entry attributes
-	 * or modify the physical address, based on the physical memory group ID
-	 * and/or additional data in struct memory_group_manager_device.
+	 * or in the physical address, based on the physical memory group ID.
 	 *
 	 * Return: A modified GPU page table entry to be stored in a page table.
 	 */
@@ -208,8 +207,9 @@ enum memory_group_manager_import_type {
  * struct memory_group_manager_import_data - Structure describing the imported
  *                                           memory
  *
- * @type:  - type of imported memory
- * @u:     - Union describing the imported memory
+ * @type:      type of imported memory
+ * @u:         Union describing the imported memory
+ * @u.dma_buf: imported memory
  *
  */
 struct memory_group_manager_import_data {

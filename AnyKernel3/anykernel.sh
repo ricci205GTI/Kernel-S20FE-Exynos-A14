@@ -4,7 +4,7 @@
 ## AnyKernel setup
 # begin properties
 properties() { '
-kernel.string=Kernel for S20 FE (Exynos) by pascua28 @ xda-developers
+kernel.string=Kernel for S20 FE (Exynos) by ricci206 @XDA developers
 do.devicecheck=1
 do.modules=0
 do.systemless=1

@@ -116,7 +116,6 @@
 #define SEC_TS_FW_BLK_SIZE_MAX		(512)
 #define SEC_TS_FW_BLK_SIZE_DEFAULT	(512)	// y761 & y771 ~
 #define SEC_TS_SELFTEST_REPORT_SIZE	80
-#define SEC_TS_PRESSURE_MAX		0x3f
 
 #define SEC_TS_FW_HEADER_SIGN		0x53494654
 #define SEC_TS_FW_CHUNK_SIGN		0x53434654
@@ -959,6 +958,7 @@ struct sec_ts_data {
 	int skipped_mode;
 	
 	u8 lp_sensitivity;
+	u8 low_sensitivity_mode;
 
 	u8 fod_vi_tx;
 	u8 fod_vi_rx;
@@ -1002,11 +1002,6 @@ struct sec_ts_data {
 	int (*sec_ts_i2c_read_bulk)(struct sec_ts_data *ts, u8 *data, int len);
 	int (*sec_ts_read_sponge)(struct sec_ts_data *ts, u8 *data, int len);
 	int (*sec_ts_write_sponge)(struct sec_ts_data *ts, u8 *data, int len);
-
-#ifdef CONFIG_FB
-	struct notifier_block fb_notif;
-#endif
-
 };
 
 struct sec_ts_plat_data {

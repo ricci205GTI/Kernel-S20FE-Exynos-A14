@@ -1111,6 +1111,21 @@ static bool __need_flush_quota(struct f2fs_sb_info *sbi)
 	return false;
 }
 
+#ifdef CONFIG_F2FS_SEC_BLOCK_OPERATIONS_DEBUG
+#define sec_dbg_inc_cnt(node, type)			\
+	do {						\
+		node.step = F2FS_SEC_DBG_##type; \
+		node.entry[F2FS_SEC_DBG_##type].nr_ops++;	\
+	} while (0)
+#define sec_dbg_add_time(node, type, start) \
+	node.entry[F2FS_SEC_DBG_##type].cumulative_jiffies +=	\
+					(get_jiffies_64() - start)
+#define sec_dbg_start_jiffies(val) val = get_jiffies_64()
+#else
+#define sec_dbg_inc_cnt(entry, type) (0)
+#define sec_dbg_add_time(entry, type, start, end) (0)
+#define sec_dbg_start_jiffies(val) (0)
+#endif
 /*
  * Freeze all the FS-operations for checkpoint.
  */
@@ -1164,11 +1179,16 @@ retry_flush_quotas:
 retry_flush_dents:
 	/* write all the dirty dentry pages */
 	if (get_pages(sbi, F2FS_DIRTY_DENTS)) {
+		sec_dbg_inc_cnt(dbg_entry, DENTS);
+		sec_dbg_start_jiffies(s_jiffies);
 		f2fs_unlock_all(sbi);
 		err = f2fs_sync_dirty_inodes(sbi, DIR_INODE);
 		if (err)
 			goto out;
 		blk_flush_plug(current);
+#ifdef CONFIG_F2FS_SEC_BLOCK_OPERATIONS_DEBUG
+		sec_dbg_add_time(dbg_entry, DENTS, s_jiffies);
+#endif
 		cond_resched();
 		goto retry_flush_quotas;
 	}
@@ -1185,12 +1205,17 @@ retry_flush_dents:
 	}
 
 	if (get_pages(sbi, F2FS_DIRTY_IMETA)) {
+		sec_dbg_inc_cnt(dbg_entry, IMETA);
+		sec_dbg_start_jiffies(s_jiffies);
 		up_write(&sbi->node_change);
 		f2fs_unlock_all(sbi);
 		err = f2fs_sync_inode_meta(sbi);
 		if (err)
 			goto out;
 		blk_flush_plug(current);
+#ifdef CONFIG_F2FS_SEC_BLOCK_OPERATIONS_DEBUG
+		sec_dbg_add_time(dbg_entry, IMETA, s_jiffies);
+#endif
 		cond_resched();
 		goto retry_flush_quotas;
 	}
@@ -1199,6 +1224,8 @@ retry_flush_nodes:
 	down_write(&sbi->node_write);
 
 	if (get_pages(sbi, F2FS_DIRTY_NODES)) {
+		sec_dbg_inc_cnt(dbg_entry, NODES);
+		sec_dbg_start_jiffies(s_jiffies);
 		up_write(&sbi->node_write);
 		atomic_inc(&sbi->wb_sync_req[NODE]);
 		err = f2fs_sync_node_pages(sbi, &wbc, false, FS_CP_NODE_IO);
@@ -1209,6 +1236,9 @@ retry_flush_nodes:
 			goto out;
 		}
 		blk_flush_plug(current);
+#ifdef CONFIG_F2FS_SEC_BLOCK_OPERATIONS_DEBUG
+		sec_dbg_add_time(dbg_entry, NODES, s_jiffies);
+#endif
 		cond_resched();
 		goto retry_flush_nodes;
 	}
@@ -1609,7 +1639,7 @@ int f2fs_write_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 			goto out;
 		}
 
-		if (NM_I(sbi)->dirty_nat_cnt == 0 &&
+		if (NM_I(sbi)->nat_cnt[DIRTY_NAT] == 0 &&
 				SIT_I(sbi)->dirty_sentries == 0 &&
 				prefree_segments(sbi) == 0) {
 			f2fs_flush_sit_entries(sbi, cpc);

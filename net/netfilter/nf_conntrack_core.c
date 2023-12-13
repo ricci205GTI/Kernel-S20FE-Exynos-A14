@@ -59,6 +59,7 @@
 #include <soc/samsung/hw_forward.h>
 #endif
 #include <net/netns/hash.h>
+#include <net/ncm.h>
 #include <net/ip.h>
 
 #include "nf_internals.h"
@@ -1201,8 +1202,6 @@ static void nf_ct_offload_timeout(struct nf_conn *ct)
 		ct->timeout = nfct_time_stamp + DAY;
 }
 
-
-
 static void gc_worker(struct work_struct *work)
 {
 	unsigned int min_interval = max(HZ / GC_MAX_BUCKETS_DIV, 1u);
@@ -1249,7 +1248,6 @@ static void gc_worker(struct work_struct *work)
 				expired_count++;
 				continue;
 			}
-
 			if (nf_conntrack_max95 == 0 || gc_worker_skip_ct(tmp))
 				continue;
 
@@ -1358,6 +1356,7 @@ __nf_conntrack_alloc(struct net *net,
 		goto out;
 
 	spin_lock_init(&ct->lock);
+
 	ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple = *orig;
 	ct->tuplehash[IP_CT_DIR_ORIGINAL].hnnode.pprev = NULL;
 	ct->tuplehash[IP_CT_DIR_REPLY].tuple = *repl;
@@ -1374,9 +1373,9 @@ __nf_conntrack_alloc(struct net *net,
 	ct->netdev = NULL;
 #endif
 	write_pnet(&ct->ct_net, net);
-	memset(&ct->__nfct_init_offset[0], 0,
+	memset(&ct->__nfct_init_offset, 0,
 	       offsetof(struct nf_conn, proto) -
-	       offsetof(struct nf_conn, __nfct_init_offset[0]));
+	       offsetof(struct nf_conn, __nfct_init_offset));
 
 	nf_ct_zone_add(ct, zone);
 

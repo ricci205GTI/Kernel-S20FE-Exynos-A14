@@ -418,7 +418,7 @@ DHDCFLAGS += -DWL_STA_ASSOC_RAND
 #Soft AP MAC randomization
 DHDCFLAGS += -DWL_SOFTAP_RAND
 #p2p MAC randomization
-DHDCFLAGS += -DWL_P2P_RAND
+#DHDCFLAGS += -DWL_P2P_RAND
 
 # Set initial country code to World Wide Safe
 DHDCFLAGS += -DCUSTOM_COUNTRY_CODE_XZ
@@ -503,7 +503,7 @@ ifneq ($(CONFIG_CFG80211_SCANTYPE_BKPORT),)
 endif
 
   DHDCFLAGS += -DWL_STATIC_IF
-  DHDCFLAGS += -DWL_STATIC_IFNAME_PREFIX="\"wlan1\""
+  DHDCFLAGS += -DWL_STATIC_IFNAME_PREFIX="\"swlan0\""
 #OWE
   DHDCFLAGS += -DWL_OWE
 # Disable HE on P2P based on peer support
@@ -789,7 +789,7 @@ ifneq ($(filter y m,$(CONFIG_BCM4375)),)
   DHDCFLAGS += -DWL_SAE
  endif
  DHDCFLAGS += -DWL_STATIC_IF
- DHDCFLAGS += -DWL_STATIC_IFNAME_PREFIX="\"wlan1\""
+ DHDCFLAGS += -DWL_STATIC_IFNAME_PREFIX="\"swlan0\""
  #OWE
  DHDCFLAGS += -DWL_OWE
 # Disable HE on P2P and SoftAP
@@ -1078,7 +1078,7 @@ ifneq ($(CONFIG_BCM4361),)
 DHDCFLAGS += -DWL_MBO
 DHDCFLAGS += -DWL_OCE
 DHDCFLAGS += -DWL_STATIC_IF
-DHDCFLAGS += -DWL_STATIC_IFNAME_PREFIX="\"wlan1\""
+DHDCFLAGS += -DWL_STATIC_IFNAME_PREFIX="\"swlan0\""
 ifneq ($(CONFIG_CFG80211_FILS_BKPORT),)
 #if kernel < 4.12, FILS patches need to be backported
 DHDCFLAGS += -DWL_FILS

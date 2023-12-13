@@ -257,10 +257,10 @@ static unsigned long get_init_ra_size(unsigned long size, unsigned long max)
 {
 	unsigned long newsize = roundup_pow_of_two(size);
 
-	if (newsize <= max >> 5)
-		newsize = newsize << 2;
-	else if (newsize <= max >> 2)
-		newsize = newsize << 1;
+	if (newsize <= max / 32)
+		newsize = newsize * 4;
+	else if (newsize <= max / 4)
+		newsize = newsize * 2;
 	else
 		newsize = max;
 
@@ -277,10 +277,10 @@ static unsigned long get_next_ra_size(struct file_ra_state *ra,
 	unsigned long cur = ra->size;
 	unsigned long newsize;
 
-	if (cur < max >> 4)
-		newsize = cur << 2;
+	if (cur < max / 16)
+		newsize = 4 * cur;
 	else
-		newsize = cur << 1;
+		newsize = 2 * cur;
 
 	return min(newsize, max);
 }
@@ -367,7 +367,7 @@ static int try_context_readahead(struct address_space *mapping,
 	 * it is a strong indication of long-run stream (or whole-file-read)
 	 */
 	if (size >= offset)
-		size <<= 1;
+		size *= 2;
 
 	ra->start = offset;
 	ra->size = min(size + req_size, max);
